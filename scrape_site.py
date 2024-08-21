@@ -31,6 +31,10 @@ def scroll_to_bottom():
             break
         last_height = new_height
 
+def clean_money(price_saleprice_dirty):
+    price_saleprice_clean = price_saleprice_dirty.replace('$','').replace(',','')
+    
+    return price_saleprice_clean
 
 # Setup the Chrome driver
 #options = webdriver.ChromeOptions()
@@ -72,12 +76,20 @@ try:
         name = card.find_element(By.CLASS_NAME, 'card__heading').text
         
         
-        price_saleprice = card.find_element(By.CLASS_NAME, 'card__product-price').text.replace('$','').split()
-        price = price_saleprice[0]
-        sale_price = price_saleprice[0]
+        price_saleprice_dirty = card.find_element(By.CLASS_NAME, 'card__product-price').text
+        price_saleprice_clean_list = clean_money(price_saleprice_dirty).split()
+        if len(price_saleprice_clean_list) == 2:
+            price, sale_price = price_saleprice_clean_list
+        elif len(price_saleprice_clean_list) == 1:
+            price = price_saleprice_clean_list[0]
+            sale_price = None
+        else:
+            price = sale_price = None
+
 
         try:
-            sale_price = card.find_element(By.CLASS_NAME, 'card__product-price-offer').text.replace('$','')
+            sale_price_string = card.find_element(By.CLASS_NAME, 'card__product-price-offer').text
+            sale_price = clean_money(sale_price_string)
         except NoSuchElementException:
             sale_price = None
             pass
