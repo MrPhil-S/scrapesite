@@ -86,6 +86,7 @@ driver = webdriver.Chrome()
 url = my_secrets.url
 # Open the URL
 driver.get(url)
+booz_page = url.rsplit('/', 1)[-1]
 
 card__information =  By.CLASS_NAME, "card__information"
 WebDriverWait(driver, 20).until(EC.presence_of_element_located(card__information))
@@ -164,14 +165,15 @@ try:
                 booz_id = booz_names_existing[item['booz_name']]
                 insert_booz_data(booz_id, item['price'], item['sale_price'], True)
             else:
+                booz_name = item['booz_name']
                 insert_query = """
                     INSERT INTO booz (booz_name, type)
-                    VALUES (%s, 'Whisky')
+                    VALUES (%s, %s)
                     """
-                cursor.execute(insert_query, (name,))
+                cursor.execute(insert_query, (booz_name, booz_page))
                 connection.commit()
                 booz_id = cursor.lastrowid
-                print(f'inserted {name}')
+                print(f'inserted {booz_name}')
                 insert_booz_data(booz_id, item['price'], item['sale_price'], False)
 except Error:
     print(f"Error: {Error}")
