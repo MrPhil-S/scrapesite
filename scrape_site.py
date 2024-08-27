@@ -69,12 +69,18 @@ def insert_booz_data(booz_id, price, sale_price, check_price):
             cursor.reset() 
             if existing_price != price or existing_sale_price != sale_price:
                 cursor.execute(insert_booz_data, (booz_id, price, sale_price))
+                connection.commit()
                 print(f'inserted prices info for EXISTING item {booz_id}')
             else:
                 print(f'Price unchanged for EXISTING item {booz_id}')
-        else:
+        else:#price does not need to be checked, this is a new item
             cursor.execute(insert_booz_data, (booz_id, price, sale_price))
-            print(f'inserted prices info for NEW item {booz_id}')
+            connection.commit()
+            print(f'inserted prices info for backfilled item {booz_id}')
+    else:#price does not need to be checked, this is a new item
+        cursor.execute(insert_booz_data, (booz_id, price, sale_price))
+        connection.commit()
+        print(f'inserted prices info for NEW item {booz_id}')
 
 # Setup the Chrome driver
 options = webdriver.ChromeOptions()
@@ -84,6 +90,7 @@ driver = webdriver.Chrome(options=options)
 driver = webdriver.Chrome()
 
 url = my_secrets.url
+
 # Open the URL
 driver.get(url)
 booz_page = url.rsplit('/', 1)[-1]
@@ -91,7 +98,7 @@ booz_page = url.rsplit('/', 1)[-1]
 card__information =  By.CLASS_NAME, "card__information"
 WebDriverWait(driver, 20).until(EC.presence_of_element_located(card__information))
 
-#scroll_to_bottom() 
+scroll_to_bottom() 
 
 cards = driver.find_elements(By.CLASS_NAME, "card__information")
 print(f'card count: {len(cards)}')
@@ -154,7 +161,18 @@ try:
     if connection.is_connected():
         cursor = connection.cursor(dictionary=True)
 
-        cursor.execute("""SELECT b.booz_id, booz_name, bs.price, bs.sale_price FROM booz b JOIN booz_scraped bs on b.booz_id = bs.booz_id""")
+        cursor.execute("""
+        SELECT price, sale_price
+        FROM booz_scraped bs
+        WHERE bs.date_scraped = 
+            (SELECT MAX(date_scraped)
+             FROM booz_scraped
+             WHERE booz_id = %s)
+        AND bs.booz_id = %s
+        """, (booz_id,booz_id,))
+        existing_data = cursor.fetchone()
+
+        cursor.execute("""SELECT b.booz_id, booz_name, bs.price, bs.sale_price FROM booz b LEFT JOIN booz_scraped bs on b.booz_id = bs.booz_id""")
         existing_items = cursor.fetchall()
         booz_names_existing = {item['booz_name']: item['booz_id'] for item in existing_items}
 
