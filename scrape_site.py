@@ -40,16 +40,16 @@ def clean_money(price_saleprice_dirty):
     
     return price_saleprice_clean
 
-def insert_booz_data(booz_id, price, sale_price, check_price):
-    insert_booz_data = """INSERT INTO booz_scraped (booz_id, price, sale_price)
-        VALUES (%s,%s,%s )
+def insert_booz_data(booz_id, price, sale_price, run_id, check_price):
+    insert_booz_data = """INSERT INTO booz_scraped (booz_id, price, sale_price, run_id)
+        VALUES (%s,%s,%s,%s)
         """
     if check_price:
         cursor.execute("""
         SELECT price, sale_price
         FROM booz_scraped bs
-        WHERE bs.date_scraped = 
-            (SELECT MAX(date_scraped)
+        WHERE bs.scrape_date = 
+            (SELECT MAX(scrape_date)
              FROM booz_scraped
              WHERE booz_id = %s)
         AND bs.booz_id = %s
@@ -68,23 +68,23 @@ def insert_booz_data(booz_id, price, sale_price, check_price):
 
             cursor.reset() 
             if existing_price != price or existing_sale_price != sale_price:
-                cursor.execute(insert_booz_data, (booz_id, price, sale_price))
+                cursor.execute(insert_booz_data, (booz_id, price, sale_price, run_id))
                 connection.commit()
                 print(f'inserted prices info for EXISTING item {booz_id}')
             else:
                 print(f'Price unchanged for EXISTING item {booz_id}')
         else:#price does not need to be checked, this is a new item
-            cursor.execute(insert_booz_data, (booz_id, price, sale_price))
+            cursor.execute(insert_booz_data, (booz_id, price, sale_price, run_id))
             connection.commit()
             print(f'inserted prices info for backfilled item {booz_id}')
     else:#price does not need to be checked, this is a new item
-        cursor.execute(insert_booz_data, (booz_id, price, sale_price))
+        cursor.execute(insert_booz_data, (booz_id, price, sale_price, run_id))
         connection.commit()
         print(f'inserted prices info for NEW item {booz_id}')
 
 # Setup the Chrome driver
 options = webdriver.ChromeOptions()
-options.add_argument('--headless')  # Run in headless mode
+#options.add_argument('--headless')  # Run in headless mode
 #options.add_argument('--disable-gpu')  # Disable GPU acceleration
 driver = webdriver.Chrome(options=options)
 driver = webdriver.Chrome()
@@ -99,6 +99,7 @@ card__information =  By.CLASS_NAME, "card__information"
 WebDriverWait(driver, 20).until(EC.presence_of_element_located(card__information))
 
 scroll_to_bottom() 
+time.sleep(5)
 
 cards = driver.find_elements(By.CLASS_NAME, "card__information")
 print(f'card count: {len(cards)}')
@@ -146,6 +147,8 @@ try:
         })
 except StaleElementReferenceException:
     print("StaleElementReferenceException encountered")
+    traceback.print_exc()
+
 
 finally:
     driver.quit()   
@@ -161,18 +164,28 @@ try:
     if connection.is_connected():
         cursor = connection.cursor(dictionary=True)
 
-        cursor.execute("""
-        SELECT price, sale_price
-        FROM booz_scraped bs
-        WHERE bs.date_scraped = 
-            (SELECT MAX(date_scraped)
-             FROM booz_scraped
-             WHERE booz_id = %s)
-        AND bs.booz_id = %s
-        """, (booz_id,booz_id,))
-        existing_data = cursor.fetchone()
+        insert_run_query = """
+            INSERT INTO run VALUES ()"""
+        cursor.execute(insert_run_query, )
+        connection.commit()
+        run_id = cursor.lastrowid
 
-        cursor.execute("""SELECT b.booz_id, booz_name, bs.price, bs.sale_price FROM booz b LEFT JOIN booz_scraped bs on b.booz_id = bs.booz_id""")
+        # cursor.execute("""
+        # SELECT price, sale_price
+        # FROM booz_scraped bs
+        # WHERE bs.date_scraped = 
+        #     (SELECT MAX(date_scraped)
+        #      FROM booz_scraped
+        #      WHERE booz_id = %s)
+        # AND bs.booz_id = %s
+        # """, (booz_id,booz_id,))
+        # existing_data = cursor.fetchone()
+
+        cursor.execute("""
+                       SELECT b.booz_id, booz_name, bs.price, bs.sale_price 
+                       FROM booz b 
+                       LEFT JOIN booz_scraped bs 
+                       on b.booz_id = bs.booz_id""")
         existing_items = cursor.fetchall()
         booz_names_existing = {item['booz_name']: item['booz_id'] for item in existing_items}
 
@@ -180,19 +193,19 @@ try:
 
         for item in scraped_booz:
             if item['booz_name'] in booz_names_existing:
-                booz_id = booz_names_existing[item['booz_name']]
-                insert_booz_data(booz_id, item['price'], item['sale_price'], True)
+                booz_id = booz_names_existing[item['booz_name']] #<<< id that correct?
+                insert_booz_data(booz_id, item['price'], item['sale_price'], run_id, True)
             else:
                 booz_name = item['booz_name']
                 insert_query = """
-                    INSERT INTO booz (booz_name, type)
-                    VALUES (%s, %s)
+                    INSERT INTO booz (booz_name, type, run_id)
+                    VALUES (%s, %s, %s)
                     """
-                cursor.execute(insert_query, (booz_name, booz_page))
+                cursor.execute(insert_query, (booz_name, booz_page, run_id))
                 connection.commit()
                 booz_id = cursor.lastrowid
                 print(f'inserted {booz_name}')
-                insert_booz_data(booz_id, item['price'], item['sale_price'], False)
+                insert_booz_data(booz_id, item['price'], item['sale_price'], run_id, False)
 except Error:
     print(f"Error: {Error}")
     traceback.print_exc()
