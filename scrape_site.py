@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 import smtplib
@@ -19,6 +20,11 @@ from selenium.webdriver.support.wait import WebDriverWait
 
 import helpers
 import my_secrets
+
+logger = logging.getLogger(__name__)
+
+logging.basicConfig(level=logging.DEBUG, filename='app.log', filemode='w', format='%(asctime)s - %(levelname)s - %(message)s')
+logger.info(f"Job started")
 
 
 def scroll_to_bottom():
@@ -87,7 +93,7 @@ options = webdriver.ChromeOptions()
 #options.add_argument('--headless')  # Run in headless mode
 #options.add_argument('--disable-gpu')  # Disable GPU acceleration
 driver = webdriver.Chrome(options=options)
-driver = webdriver.Chrome()
+#driver = webdriver.Chrome()
 
 url = my_secrets.url
 
@@ -209,6 +215,8 @@ try:
 except Error:
     print(f"Error: {Error}")
     traceback.print_exc()
+    logger.error(traceback.print_exc())
+
 
 finally:
     if cursor:
@@ -216,7 +224,7 @@ finally:
     if connection.is_connected():
         connection.close()
 
-    
+    logger.info(f"Job finished successfully")
           
 
 
