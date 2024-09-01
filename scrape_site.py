@@ -9,7 +9,7 @@ from email.mime.text import MIMEText
 
 import mysql.connector
 from mysql.connector import Error
-from selenium import webdriver
+#from selenium import webdriver
 from selenium.common.exceptions import (NoSuchElementException,
                                         StaleElementReferenceException)
 from selenium.webdriver import ActionChains
@@ -18,6 +18,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support.wait import WebDriverWait
 
+import driver
 import helpers
 import my_secrets
 
@@ -88,11 +89,27 @@ def insert_booz_data(booz_id, price, sale_price, run_id, check_price):
         connection.commit()
         print(f'inserted prices info for NEW item {booz_id}')
 
+# Function to send email notification
+def send_email(subject, body):
+    sender_email = "nopschims@gmail.com"
+    receiver_email = "pschims@gmail.com"
+    password =my_secrets.gmail_app_pw
+
+    msg = MIMEText(body)
+    msg['Subject'] = subject
+    msg['From'] = sender_email
+    msg['To'] = receiver_email
+
+    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+        server.login(sender_email, password)
+        server.sendmail(sender_email, receiver_email, msg.as_string())
+
+
 # Setup the Chrome driver
-options = webdriver.ChromeOptions()
-#options.add_argument('--headless')  # Run in headless mode
-#options.add_argument('--disable-gpu')  # Disable GPU acceleration
-driver = webdriver.Chrome(options=options)
+#options = driver.webdriver.ChromeOptions()
+#driver.options.add_argument('--headless')  # Run in headless mode
+#driver.options.add_argument('--disable-gpu')  # Disable GPU acceleration
+driver = driver.driver
 #driver = webdriver.Chrome()
 
 url = my_secrets.url
@@ -104,7 +121,7 @@ booz_page = url.rsplit('/', 1)[-1]
 card__information =  By.CLASS_NAME, "card__information"
 WebDriverWait(driver, 20).until(EC.presence_of_element_located(card__information))
 
-scroll_to_bottom() 
+#scroll_to_bottom() 
 time.sleep(5)
 
 cards = driver.find_elements(By.CLASS_NAME, "card__information")
