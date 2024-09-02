@@ -27,7 +27,6 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG, filename='app.log', filemode='w', format='%(asctime)s - %(levelname)s - %(message)s')
 logger.info(f"Job started")
 
-
 def scroll_to_bottom():
     # Get scroll height.
     last_height = driver.execute_script("return document.body.scrollHeight")
@@ -90,7 +89,7 @@ def insert_booz_data(booz_id, price, sale_price, run_id, check_price):
         print(f'inserted prices info for NEW item {booz_id}')
 
 # Function to send email notification
-def send_email(subject, body):
+def xsend_email(subject, body):
     sender_email = "nopschims@gmail.com"
     receiver_email = "pschims@gmail.com"
     password =my_secrets.gmail_app_pw
@@ -103,6 +102,47 @@ def send_email(subject, body):
     with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
         server.login(sender_email, password)
         server.sendmail(sender_email, receiver_email, msg.as_string())
+
+
+def get_watchlist_hits():
+    cursor.execute("""
+                    SELECT b.booz_id, b.booz_name, COALESCE(bs.sale_price, bs.price) price, w.price_point
+                    FROM `booz` b 
+                    LEFT JOIN
+                        (SELECT
+                        ROW_NUMBER() OVER (PARTITION BY booz_id ORDER BY scrape_date DESC) AS row_num,
+                            booz_id, 
+                            price,
+                            sale_price,
+                            scrape_date 
+                        FROM  booz_scraped )bs 
+                    ON b.booz_id = bs.booz_id and bs.row_num = 1
+                    LEFT JOIN watchlist w
+                    ON w.booz_name = b.booz_name
+                    WHERE COALESCE(bs.sale_price, bs.price) < w.price_point""")
+    watchlist_hits = cursor.fetchall()
+
+    formatted_watchlist = [f"{row['booz_name']} ({row['booz_id']}) is below the price point of {row['price_point']}$: It is now <b>{row['price']}$</b>" for row in watchlist_hits]
+     
+    return formatted_watchlist
+
+
+def get_sale_hits(discount):
+    cursor.execute(f"""
+                    SELECT b.booz_id, b.booz_name, bs.price, bs.sale_price,  cast(100-(bs.sale_price/bs.price*100) as int) discount
+                    FROM `booz_scraped` bs 
+                    JOIN booz b 
+                    ON b.booz_id = bs.booz_id  
+                    WHERE 100-(bs.sale_price/bs.price*100) > {discount}
+                    ORDER BY 100-(bs.sale_price/bs.price*100) DESC""")
+    sale_hits = cursor.fetchall()
+
+    formatted_salelist = [f"{row['booz_name']} ({row['booz_id']}): <s>{row['price']}$</s>  <b>{row['sale_price']}$ {row['discount']}%</b> off!" for row in sale_hits]
+     
+    return formatted_salelist
+
+
+
 
 
 # Setup the Chrome driver
@@ -184,12 +224,22 @@ try:
     # Establish a connection to the MariaDB database
     connection = mysql.connector.connect(**db_config)
 
+    helpers.get_execution_context
+    helpers.get_username    
+
     if connection.is_connected():
         cursor = connection.cursor(dictionary=True)
 
+        
+
         insert_run_query = """
-            INSERT INTO run VALUES ()"""
-        cursor.execute(insert_run_query, )
+            INSERT INTO run (username, execution_context) 
+            VALUES (%s, %s)"""
+        username = helpers.get_username()
+        execution_context = helpers.get_execution_context()
+
+        # Execute the query with the parameters
+        cursor.execute(insert_run_query, (username, execution_context))
         connection.commit()
         run_id = cursor.lastrowid
 
@@ -229,10 +279,18 @@ try:
                 booz_id = cursor.lastrowid
                 print(f'inserted {booz_name}')
                 insert_booz_data(booz_id, item['price'], item['sale_price'], run_id, False)
+
+    formatted_watchlist = get_watchlist_hits()
+    formatted_salelist  = get_sale_hits(25)
+    helpers.send_email(formatted_watchlist, formatted_salelist)
+
+    
+
 except Error:
     print(f"Error: {Error}")
     traceback.print_exc()
     logger.error(traceback.print_exc())
+
 
 
 finally:
@@ -241,7 +299,10 @@ finally:
     if connection.is_connected():
         connection.close()
 
-    logger.info(f"Job finished successfully")
+
+
+
+logger.info(f"Job finished successfully")
           
 
 
