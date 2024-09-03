@@ -88,25 +88,10 @@ def insert_booz_data(booz_id, price, sale_price, run_id, check_price):
         connection.commit()
         print(f'inserted prices info for NEW item {booz_id}')
 
-# Function to send email notification
-def xsend_email(subject, body):
-    sender_email = "nopschims@gmail.com"
-    receiver_email = "pschims@gmail.com"
-    password =my_secrets.gmail_app_pw
-
-    msg = MIMEText(body)
-    msg['Subject'] = subject
-    msg['From'] = sender_email
-    msg['To'] = receiver_email
-
-    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
-        server.login(sender_email, password)
-        server.sendmail(sender_email, receiver_email, msg.as_string())
-
 
 def get_watchlist_hits():
     cursor.execute("""
-                    SELECT b.booz_id, b.booz_name, COALESCE(bs.sale_price, bs.price) price, w.price_point
+                    SELECT b.booz_id, b.booz_name, b.link, COALESCE(bs.sale_price, bs.price) price, w.price_point
                     FROM `booz` b 
                     LEFT JOIN
                         (SELECT
@@ -122,14 +107,14 @@ def get_watchlist_hits():
                     WHERE COALESCE(bs.sale_price, bs.price) < w.price_point""")
     watchlist_hits = cursor.fetchall()
 
-    formatted_watchlist = [f"{row['booz_name']} ({row['booz_id']}) is below the price point of {row['price_point']}$: It is now <b>{row['price']}$</b>" for row in watchlist_hits]
+    formatted_watchlist = [f'<a href="{row["link"]}">{row["booz_name"]}</a> ({row["booz_id"]}) is below the price point of {row["price_point"]}$: It is now <b>{row["price"]}$</b>' for row in watchlist_hits]
      
     return formatted_watchlist
 
 
 def get_sale_hits(discount):
     cursor.execute(f"""
-                    SELECT b.booz_id, b.booz_name, bs.price, bs.sale_price,  cast(100-(bs.sale_price/bs.price*100) as int) discount
+                    SELECT b.booz_id, b.booz_name, b.link, bs.price, bs.sale_price,  cast(100-(bs.sale_price/bs.price*100) as int) discount
                     FROM `booz_scraped` bs 
                     JOIN booz b 
                     ON b.booz_id = bs.booz_id  
@@ -137,7 +122,7 @@ def get_sale_hits(discount):
                     ORDER BY 100-(bs.sale_price/bs.price*100) DESC""")
     sale_hits = cursor.fetchall()
 
-    formatted_salelist = [f"{row['booz_name']} ({row['booz_id']}): <s>{row['price']}$</s>  <b>{row['sale_price']}$ {row['discount']}%</b> off!" for row in sale_hits]
+    formatted_salelist = [f'<a href="{row["link"]}">{row["booz_name"]}</a> ({row["booz_id"]}): <s>{row["price"]}$</s>  <b>{row["sale_price"]}$ {row["discount"]}%</b> off!' for row in sale_hits]
      
     return formatted_salelist
 
@@ -161,7 +146,7 @@ booz_page = url.rsplit('/', 1)[-1]
 card__information =  By.CLASS_NAME, "card__information"
 WebDriverWait(driver, 20).until(EC.presence_of_element_located(card__information))
 
-#scroll_to_bottom() 
+scroll_to_bottom() 
 time.sleep(5)
 
 cards = driver.find_elements(By.CLASS_NAME, "card__information")
@@ -172,7 +157,8 @@ scraped_booz = []
 try:    
     for card in cards:
         name = card.find_element(By.CLASS_NAME, 'card__heading').text
-                    
+        link_element = card.find_element(By.CLASS_NAME, 'full-unstyled-link')
+        link = link_element.get_attribute('href')
         price_saleprice_dirty = card.find_element(By.CLASS_NAME, 'card__product-price').text
         price_saleprice_clean_list = clean_money(price_saleprice_dirty).split()
         if len(price_saleprice_clean_list) == 2:
@@ -206,7 +192,8 @@ try:
         scraped_booz.append({
             'booz_name': name,
             'price': price,
-            'sale_price': sale_price 
+            'sale_price': sale_price,
+            'link': link 
         })
 except StaleElementReferenceException:
     print("StaleElementReferenceException encountered")
@@ -270,11 +257,12 @@ try:
                 insert_booz_data(booz_id, item['price'], item['sale_price'], run_id, True)
             else:
                 booz_name = item['booz_name']
+                link = item['link']
                 insert_query = """
-                    INSERT INTO booz (booz_name, type, run_id)
-                    VALUES (%s, %s, %s)
+                    INSERT INTO booz (booz_name, type, link, run_id)
+                    VALUES (%s, %s, %s, %s)
                     """
-                cursor.execute(insert_query, (booz_name, booz_page, run_id))
+                cursor.execute(insert_query, (booz_name, booz_page, link, run_id))
                 connection.commit()
                 booz_id = cursor.lastrowid
                 print(f'inserted {booz_name}')
