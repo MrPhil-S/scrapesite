@@ -1,6 +1,6 @@
 __pycache__/
 scrapeboozvenv/
 my_secrets.py
-helpers.py
 *.log
 temp.txt
+*.html

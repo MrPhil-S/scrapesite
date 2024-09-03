@@ -21,6 +21,7 @@ from selenium.webdriver.support.wait import WebDriverWait
 import driver
 import helpers
 import my_secrets
+from connection import connect_to_db  # Connect to MySQL connection.
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +96,7 @@ def get_watchlist_hits():
                     FROM `booz` b 
                     LEFT JOIN
                         (SELECT
-                        ROW_NUMBER() OVER (PARTITION BY booz_id ORDER BY scrape_date DESC) AS row_num,
+                            ROW_NUMBER() OVER (PARTITION BY booz_id ORDER BY scrape_date DESC) AS row_num,
                             booz_id, 
                             price,
                             sale_price,
@@ -114,21 +115,29 @@ def get_watchlist_hits():
 
 def get_sale_hits(discount):
     cursor.execute(f"""
-                    SELECT b.booz_id, b.booz_name, b.link, bs.price, bs.sale_price,  cast(100-(bs.sale_price/bs.price*100) as int) discount
-                    FROM `booz_scraped` bs 
-                    JOIN booz b 
-                    ON b.booz_id = bs.booz_id  
+                    SELECT b.booz_id, b.booz_name, b.link, bs.price, bs.sale_price, cast(100-(bs.sale_price/bs.price*100) as int) discount
+                    FROM  booz b 
+                    JOIN 
+                        (SELECT
+                            ROW_NUMBER() OVER (PARTITION BY booz_id ORDER BY scrape_date DESC) AS row_num,
+                            booz_id, 
+                            price,
+                            sale_price
+                        FROM  booz_scraped ) bs 
+                    ON b.booz_id = bs.booz_id and bs.row_num = 1
                     WHERE 100-(bs.sale_price/bs.price*100) > {discount}
                     ORDER BY 100-(bs.sale_price/bs.price*100) DESC""")
     sale_hits = cursor.fetchall()
+    sale_booz_ids = [row["booz_id"] for row in sale_hits]
+    #img_base64 = generate_price_history_chart()
 
-    formatted_salelist = [f'<a href="{row["link"]}">{row["booz_name"]}</a> ({row["booz_id"]}): <s>{row["price"]}$</s>  <b>{row["sale_price"]}$ {row["discount"]}%</b> off!' for row in sale_hits]
+    formatted_salelist = [f'''<a href="{row["link"]}">{row["booz_name"]}</a> ({row["booz_id"]}): <s>{row["price"]}$</s>  <b>{row["sale_price"]}$ {row["discount"]}%</b> off!
+                          <br><img src="data:image/png;base64,{helpers.generate_price_history_chart(row["booz_id"])}" alt="Price History Chart">
+                          ''' for row in sale_hits]
      
+
+
     return formatted_salelist
-
-
-
-
 
 # Setup the Chrome driver
 #options = driver.webdriver.ChromeOptions()
@@ -146,7 +155,7 @@ booz_page = url.rsplit('/', 1)[-1]
 card__information =  By.CLASS_NAME, "card__information"
 WebDriverWait(driver, 20).until(EC.presence_of_element_located(card__information))
 
-scroll_to_bottom() 
+#scroll_to_bottom() 
 time.sleep(5)
 
 cards = driver.find_elements(By.CLASS_NAME, "card__information")
@@ -204,13 +213,10 @@ finally:
     driver.quit()   
 
 
-# Database connection parameters
-db_config = my_secrets.db_config
+
 
 try:
-    # Establish a connection to the MariaDB database
-    connection = mysql.connector.connect(**db_config)
-
+    connection = connect_to_db()
     helpers.get_execution_context
     helpers.get_username    
 
@@ -269,12 +275,12 @@ try:
                 insert_booz_data(booz_id, item['price'], item['sale_price'], run_id, False)
 
     formatted_watchlist = get_watchlist_hits()
-    formatted_salelist  = get_sale_hits(25)
+    formatted_salelist = get_sale_hits(25)
     helpers.send_email(formatted_watchlist, formatted_salelist)
 
     
 
-except Error:
+except (Error, mysql.connector.Error) as Error:
     print(f"Error: {Error}")
     traceback.print_exc()
     logger.error(traceback.print_exc())
