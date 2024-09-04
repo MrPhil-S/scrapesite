@@ -128,16 +128,33 @@ def get_sale_hits(discount):
                     WHERE 100-(bs.sale_price/bs.price*100) > {discount}
                     ORDER BY 100-(bs.sale_price/bs.price*100) DESC""")
     sale_hits = cursor.fetchall()
-    sale_booz_ids = [row["booz_id"] for row in sale_hits]
-    #img_base64 = generate_price_history_chart()
 
     formatted_salelist = [f'''<a href="{row["link"]}">{row["booz_name"]}</a> ({row["booz_id"]}): <s>{row["price"]}$</s>  <b>{row["sale_price"]}$ {row["discount"]}%</b> off!
-                          <br><img src="data:image/png;base64,{helpers.generate_price_history_chart(row["booz_id"])}" alt="Price History Chart">
                           ''' for row in sale_hits]
-     
-
-
+                #<br><img src="data:image/png;base64,{helpers.generate_price_history_chart(row["booz_id"])}" alt="Price History Chart">
+                          
     return formatted_salelist
+
+def get_new_or_changed_prices(run_id):
+    cursor.execute(f"""
+    SELECT b.booz_id, b.booz_name, b.link, bs.price, bs.sale_price, cast(100-(bs.sale_price/bs.price*100) as int) discount
+    FROM booz b
+JOIN 
+	(SELECT
+    ROW_NUMBER() OVER (PARTITION BY booz_id ORDER BY scrape_date DESC) AS row_num,
+     run_id,
+     booz_id, 
+     price,
+     sale_price,
+     scrape_date 
+     FROM  booz_scraped )bs 
+    ON b.booz_id = bs.booz_id and bs.row_num = 1  
+    WHERE bs.run_id = {run_id} 
+    ORDER BY `b`.`run_id`  DESC""")
+    new_or_changed_prices = cursor.fetchall()
+    formatted_new_or_changed_prices = [f'''<a href="{row["link"]}">{row["booz_name"]}</a> ({row["booz_id"]}): <s>{row["price"]}$</s>  <b>{row["sale_price"]}$ {row["discount"]}%</b> off!''' for row in new_or_changed_prices]
+
+    return formatted_new_or_changed_prices
 
 # Setup the Chrome driver
 #options = driver.webdriver.ChromeOptions()
@@ -155,7 +172,7 @@ booz_page = url.rsplit('/', 1)[-1]
 card__information =  By.CLASS_NAME, "card__information"
 WebDriverWait(driver, 20).until(EC.presence_of_element_located(card__information))
 
-#scroll_to_bottom() 
+scroll_to_bottom() 
 time.sleep(5)
 
 cards = driver.find_elements(By.CLASS_NAME, "card__information")
@@ -276,7 +293,8 @@ try:
 
     formatted_watchlist = get_watchlist_hits()
     formatted_salelist = get_sale_hits(25)
-    helpers.send_email(formatted_watchlist, formatted_salelist)
+    formatted_new_or_changed_prices = get_new_or_changed_prices(run_id)
+    helpers.send_email(formatted_watchlist, formatted_salelist, formatted_new_or_changed_prices)
 
     
 

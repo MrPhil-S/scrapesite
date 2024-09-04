@@ -31,7 +31,7 @@ def get_username():
 
 
 # Function to send email notification
-def send_email(watchlist_items=None, deal_items=None):
+def send_email(watchlist_items=None, deal_items=None, new_or_changed_prices=None):
     sender_email = "nopschims@gmail.com"
     receiver_email = "pschims@gmail.com"
     password = gmail_app_pw
@@ -58,7 +58,16 @@ def send_email(watchlist_items=None, deal_items=None):
     else:
         deal_html = ''
 
-
+    if new_or_changed_prices:
+        price_items_html = ''.join(f'<li>{price_item}</li>' for price_item in new_or_changed_prices)
+        price_change_html = f"""
+        <p>Price Changes for this run ID:</p>
+        <ul>
+            {price_items_html}
+        </ul>
+        """
+    else:
+        price_change_html = ''
     # Create the complete HTML body
     body_html = f"""
     <html>
@@ -68,6 +77,7 @@ def send_email(watchlist_items=None, deal_items=None):
         <p><strong>For {time.ctime()}</strong></p>
         {watchlist_html}
         {deal_html}
+        {price_change_html}
     </body>
     </html>
     """
