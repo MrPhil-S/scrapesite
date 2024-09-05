@@ -31,7 +31,7 @@ def get_username():
 
 
 # Function to send email notification
-def send_email(watchlist_items=None, deal_items=None, new_or_changed_prices=None):
+def send_email(deal_items, new_or_changed_prices, percent_discounted, average_discount, watchlist_items=None):
     sender_email = "nopschims@gmail.com"
     receiver_email = "pschims@gmail.com"
     password = gmail_app_pw
@@ -50,7 +50,7 @@ def send_email(watchlist_items=None, deal_items=None, new_or_changed_prices=None
     if deal_items:
         deal_items_html = ''.join(f'<li>{deal_item}</li>' for deal_item in deal_items)
         deal_html = f"""
-        <p>Deals:</p>
+        <p>Top Deals:</p>
         <ul>
             {deal_items_html}
         </ul>
@@ -75,6 +75,15 @@ def send_email(watchlist_items=None, deal_items=None, new_or_changed_prices=None
     <body>
         <h1>Booz update </h1>
         <p><strong>For {time.ctime()}</strong></p>
+        <p>Here's what's new:</p>
+        <p style="border-bottom: 1px solid black">
+            <span style="font-weight: bold">Percent Discounted: </span>
+            <span style="font-weight: bold; color: {percent_discounted >= 50 and 'green' or percent_discounted >= 25 and 'orange' or 'red'}">
+                {percent_discounted}%</span>
+            <span style="margin-left: 2em; font-weight: bold">Average Discount: </span>
+            <span style="font-weight: bold; color: {average_discount >= 50 and 'green' or average_discount >= 25 and 'orange' or 'red'}">
+                {average_discount}%</span>
+        </p>
         {watchlist_html}
         {deal_html}
         {price_change_html}

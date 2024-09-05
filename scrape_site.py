@@ -156,6 +156,23 @@ JOIN
 
     return formatted_new_or_changed_prices
 
+def get_percent_discounted():
+    cursor.execute("""
+        SELECT CAST(COUNT(sale_price) / COUNT(*) * 100 AS INT) AS percent_discounted
+        FROM booz_scraped
+    """)
+    result = cursor.fetchone()
+    return result["percent_discounted"]
+
+def get_average_discount():
+    cursor.execute("""
+        SELECT CAST(AVG(100-(bs.sale_price/bs.price*100) )as int) average_discount 
+        FROM booz_scraped bs
+        WHERE sale_price is not null""")
+    result = cursor.fetchone()
+    return result["average_discount"]
+
+
 # Setup the Chrome driver
 #options = driver.webdriver.ChromeOptions()
 #driver.options.add_argument('--headless')  # Run in headless mode
@@ -172,7 +189,7 @@ booz_page = url.rsplit('/', 1)[-1]
 card__information =  By.CLASS_NAME, "card__information"
 WebDriverWait(driver, 20).until(EC.presence_of_element_located(card__information))
 
-scroll_to_bottom() 
+#scroll_to_bottom() 
 time.sleep(5)
 
 cards = driver.find_elements(By.CLASS_NAME, "card__information")
@@ -294,7 +311,9 @@ try:
     formatted_watchlist = get_watchlist_hits()
     formatted_salelist = get_sale_hits(25)
     formatted_new_or_changed_prices = get_new_or_changed_prices(run_id)
-    helpers.send_email(formatted_watchlist, formatted_salelist, formatted_new_or_changed_prices)
+    percent_discounted = get_percent_discounted()
+    average_discount = get_average_discount()
+    helpers.send_email(formatted_salelist, formatted_new_or_changed_prices, percent_discounted, average_discount, formatted_watchlist)
 
     
 
