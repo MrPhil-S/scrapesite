@@ -140,26 +140,46 @@ def get_sale_hits(discount):
 
 def get_new_or_changed_prices(run_id):
     cursor.execute(f"""
-    SELECT b.booz_id, b.booz_name, b.link, bs.price, bs.sale_price, cast(100-(bs.sale_price/bs.price*100) as int) discount
-    FROM booz b
-JOIN 
-	(SELECT
-    ROW_NUMBER() OVER (PARTITION BY booz_id ORDER BY scrape_date DESC) AS row_num,
-     run_id,
-     booz_id, 
-     price,
-     sale_price,
-     scrape_date 
-     FROM  booz_scraped )bs 
-    ON b.booz_id = bs.booz_id and bs.row_num = 1  
-    WHERE bs.run_id = {run_id} 
-    ORDER BY `b`.`run_id` DESC""")
+WITH cte AS
+(SELECT 
+    	b.booz_id,
+    	b.booz_name,
+    	b.link,
+    	bs.price,
+    	bs.sale_price,
+    	bs.run_id,
+    	ROW_NUMBER() OVER (PARTITION BY bs.booz_id ORDER BY bs.scrape_date DESC) AS row_num
+    FROM booz_scraped bs
+    JOIN booz  b
+    ON bs.booz_id = b.booz_id
+    WHERE bs.run_id <= 31)
+SELECT
+ 	current_price.booz_id,
+    current_price.booz_name,
+    current_price.link,
+    current_price.price c_price,
+    current_price.sale_price c_sale_price,
+    CAST(100-(current_price.sale_price/current_price.price * 100) AS INT) c_discount,
+    previous_price.price p_price,
+    previous_price.sale_price p_sale_price,
+    CAST(100 - (previous_price.sale_price/previous_price.price *100) AS INT) p_discount,
+    CASE WHEN current_price.sale_price >= previous_price.price THEN 1 
+        WHEN current_price.price > previous_price.price AND current_price.sale_price IS NOT NULL THEN 2 
+        ELSE NULL END gouge_type
+ FROM cte current_price
+ JOIN cte previous_price 
+ ON current_price.booz_id = previous_price.booz_id AND previous_price.row_num = 2 
+ WHERE current_price.row_num = 1""")
     new_or_changed_prices = cursor.fetchall()
-    formatted_new_or_changed_prices = [f'''<a href="{row["link"]}">{row["booz_name"]}</a> ({row["booz_id"]})
-                          <br><s>${row["price"]}</s>  <b>${row["sale_price"]} {row["discount"]}%</b> off!''' 
-                          if row["sale_price"] is not None else
-                          f'''<a href="{row["link"]}">{row["booz_name"]}</a> ({row["booz_id"]})
-                          <br><b>${row["price"]}</b>'''
+    formatted_new_or_changed_prices = [f'''<a href="{row["link"]}">{row["booz_name"]}</a> ({row["booz_id"]})<br>'''
+                          + (f'''Currently <s>${row["c_price"]}</s> <b>${row["c_sale_price"]} {row["c_discount"]}%</b> off!''' if row["c_sale_price"] is not None else 
+                             f'''Currently ${row["c_price"]}''')
+
+                          + (f''' Previously <s>${row["p_price"]}</s> <b>${row["p_sale_price"]} {row["p_discount"]}%</b> off!''' if row["p_sale_price"] is not None else 
+                             f''' Previously ${row["p_price"]}''')
+                          + (f'''<b style="color:red"> (Sale not better then previous price!) </b>''' if row["gouge_type"] == 1 else
+                             f'''<b style="color:red"> (Bumped price above previous price) </b>''' if row["gouge_type"] == 2 else
+                             '')
                           for row in new_or_changed_prices]
 
     return formatted_new_or_changed_prices
