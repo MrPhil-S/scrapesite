@@ -92,7 +92,7 @@ def insert_booz_data(booz_id, price, sale_price, run_id, check_price):
 
 def get_watchlist_hits():
     cursor.execute("""
-                    SELECT b.booz_id, b.booz_name, b.link, COALESCE(bs.sale_price, bs.price) price, w.price_point
+                    SELECT b.booz_id, b.link, b.booz_name, b.link, COALESCE(bs.sale_price, bs.price) price, w.price_point
                     FROM `booz` b 
                     LEFT JOIN
                         (SELECT
@@ -108,7 +108,9 @@ def get_watchlist_hits():
                     WHERE COALESCE(bs.sale_price, bs.price) < w.price_point""")
     watchlist_hits = cursor.fetchall()
 
-    formatted_watchlist = [f'<a href="{row["link"]}">{row["booz_name"]}</a> ({row["booz_id"]}) is below the price point of {row["price_point"]}$: It is now <b>{row["price"]}$</b>' for row in watchlist_hits]
+    formatted_watchlist = [f'''<a href="{row["link"]}">{row["booz_name"]}</a> ({row["booz_id"]}) 
+                           <br> The price is below the price point of ${row["price_point"]}: It is now <b>${row["price"]}</b>''' 
+                           for row in watchlist_hits]
      
     return formatted_watchlist
 
@@ -129,7 +131,8 @@ def get_sale_hits(discount):
                     ORDER BY 100-(bs.sale_price/bs.price*100) DESC""")
     sale_hits = cursor.fetchall()
 
-    formatted_salelist = [f'''<a href="{row["link"]}">{row["booz_name"]}</a> ({row["booz_id"]}): <s>{row["price"]}$</s>  <b>{row["sale_price"]}$ {row["discount"]}%</b> off!
+    formatted_salelist = [f'''<a href="{row["link"]}">{row["booz_name"]}</a> ({row["booz_id"]})
+                          <br> <s>${row["price"]}</s>  <b>${row["sale_price"]} {row["discount"]}%</b> off!
                           ''' for row in sale_hits]
                 #<br><img src="data:image/png;base64,{helpers.generate_price_history_chart(row["booz_id"])}" alt="Price History Chart">
                           
@@ -150,9 +153,14 @@ JOIN
      FROM  booz_scraped )bs 
     ON b.booz_id = bs.booz_id and bs.row_num = 1  
     WHERE bs.run_id = {run_id} 
-    ORDER BY `b`.`run_id`  DESC""")
+    ORDER BY `b`.`run_id` DESC""")
     new_or_changed_prices = cursor.fetchall()
-    formatted_new_or_changed_prices = [f'''<a href="{row["link"]}">{row["booz_name"]}</a> ({row["booz_id"]}): <s>{row["price"]}$</s>  <b>{row["sale_price"]}$ {row["discount"]}%</b> off!''' for row in new_or_changed_prices]
+    formatted_new_or_changed_prices = [f'''<a href="{row["link"]}">{row["booz_name"]}</a> ({row["booz_id"]})
+                          <br><s>${row["price"]}</s>  <b>${row["sale_price"]} {row["discount"]}%</b> off!''' 
+                          if row["sale_price"] is not None else
+                          f'''<a href="{row["link"]}">{row["booz_name"]}</a> ({row["booz_id"]})
+                          <br><b>${row["price"]}</b>'''
+                          for row in new_or_changed_prices]
 
     return formatted_new_or_changed_prices
 

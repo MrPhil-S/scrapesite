@@ -31,43 +31,43 @@ def get_username():
 
 
 # Function to send email notification
-def send_email(deal_items, new_or_changed_prices, percent_discounted, average_discount, watchlist_items=None):
+def send_email(formatted_salelist, formatted_new_or_changed_prices, percent_discounted, average_discount, formatted_watchlist=None):
     sender_email = "nopschims@gmail.com"
     receiver_email = "pschims@gmail.com"
     password = gmail_app_pw
 
-    if watchlist_items:
-        watchlist_items_html = ''.join(f'<li>{watchlist_item}</li>' for watchlist_item in watchlist_items)
-        watchlist_html = f"""
+    if formatted_watchlist:
+        formatted_watchlist_list = ''.join(f'<li>{watchlist_item}</li>' for watchlist_item in formatted_watchlist)
+        watchlist_scection = f"""
         <p>Watchlist:</p>
         <ul>
-            {watchlist_items_html}
+            {formatted_watchlist_list}
         </ul>
         """
     else:
-        watchlist_html = ''
+        watchlist_scection = ''
 
-    if deal_items:
-        deal_items_html = ''.join(f'<li>{deal_item}</li>' for deal_item in deal_items)
-        deal_html = f"""
+    if formatted_salelist:
+        formatted_salelist_list = ''.join(f'<li>{deal_item}</li>' for deal_item in formatted_salelist)
+        salelist_section = f"""
         <p>Top Deals:</p>
         <ul>
-            {deal_items_html}
+            {formatted_salelist_list}
         </ul>
         """
     else:
-        deal_html = ''
+        salelist_section = ''
 
-    if new_or_changed_prices:
-        price_items_html = ''.join(f'<li>{price_item}</li>' for price_item in new_or_changed_prices)
-        price_change_html = f"""
+    if formatted_new_or_changed_prices:
+        formatted_new_or_changed_prices_list = ''.join(f'<li>{price_item}</li>' for price_item in formatted_new_or_changed_prices)
+        formatted_new_or_changed_prices_section = f"""
         <p>Price Changes for this run ID:</p>
         <ul>
-            {price_items_html}
+            {formatted_new_or_changed_prices_list}
         </ul>
         """
     else:
-        price_change_html = ''
+        formatted_new_or_changed_prices_section = ''
     # Create the complete HTML body
     body_html = f"""
     <html>
@@ -84,9 +84,9 @@ def send_email(deal_items, new_or_changed_prices, percent_discounted, average_di
             <span style="font-weight: bold; color: {average_discount >= 50 and 'green' or average_discount >= 25 and 'orange' or 'red'}">
                 {average_discount}%</span>
         </p>
-        {watchlist_html}
-        {deal_html}
-        {price_change_html}
+        {watchlist_scection}
+        {salelist_section}
+        {formatted_new_or_changed_prices_section}
     </body>
     </html>
     """
