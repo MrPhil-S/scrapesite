@@ -21,26 +21,12 @@ from selenium.webdriver.support.wait import WebDriverWait
 import driver
 import helpers
 import my_secrets
-from connection import connect_to_db  # Connect to MySQL connection.
 
 logger = logging.getLogger(__name__)
 
 logging.basicConfig(level=logging.DEBUG, filename='app.log', filemode='w', format='%(asctime)s - %(levelname)s - %(message)s')
 logger.info(f"Job started")
 
-def scroll_to_bottom():
-    # Get scroll height.
-    last_height = driver.execute_script("return document.body.scrollHeight")
-
-    while True:
-        # Scroll down to the bottom.
-        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-        time.sleep(7)
-        # Calculate new scroll height and compare with last scroll height.
-        new_height = driver.execute_script("return document.body.scrollHeight")
-        if new_height == last_height:
-            break
-        last_height = new_height
 
 def clean_money(price_saleprice_dirty):
     price_saleprice_clean = price_saleprice_dirty.replace('$','').replace(',','')
@@ -217,8 +203,19 @@ booz_page = url.rsplit('/', 1)[-1]
 card__information =  By.CLASS_NAME, "card__information"
 WebDriverWait(driver, 20).until(EC.presence_of_element_located(card__information))
 
-#scroll_to_bottom() 
-time.sleep(5)
+username = helpers.get_username()
+
+#### Environment settings  #######
+if username == 'pi':
+    print('START SCROLL')
+    helpers.scroll_to_bottom()
+    connection = mysql.connector.connect(**my_secrets.db_config_production)
+    #TODO: #Add random dealy
+else:
+    connection = mysql.connector.connect(**my_secrets.db_config_dev)
+    pass 
+
+time.sleep(10)
 
 cards = driver.find_elements(By.CLASS_NAME, "card__information")
 print(f'card count: {len(cards)}')
@@ -274,18 +271,12 @@ except StaleElementReferenceException:
 finally:
     driver.quit()   
 
-
-
-
 try:
-    connection = connect_to_db()
     helpers.get_execution_context
-    helpers.get_username    
+    #helpers.get_username    
 
     if connection.is_connected():
         cursor = connection.cursor(dictionary=True)
-
-        
 
         insert_run_query = """
             INSERT INTO run (username, execution_context) 
@@ -335,7 +326,8 @@ try:
                 booz_id = cursor.lastrowid
                 print(f'inserted {booz_name}')
                 insert_booz_data(booz_id, item['price'], item['sale_price'], run_id, False)
-
+    else:
+        print("Not connected to the database")
     formatted_watchlist = get_watchlist_hits()
     formatted_salelist = get_sale_hits(25)
     formatted_new_or_changed_prices = get_new_or_changed_prices(run_id)
@@ -350,16 +342,11 @@ except (Error, mysql.connector.Error) as Error:
     traceback.print_exc()
     logger.error(traceback.print_exc())
 
-
-
 finally:
     if cursor:
         cursor.close()
     if connection.is_connected():
         connection.close()
-
-
-
 
 logger.info(f"Job finished successfully")
           

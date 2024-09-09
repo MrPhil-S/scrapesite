@@ -14,20 +14,35 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from connection import connect_to_db
+import driver
 from my_secrets import gmail_app_pw
 
-#from scrape_site import sale_booz_ids
-
-
-def get_execution_context():
-    return os.getenv('USER_EXECUTION', 'manual')
 
 def get_username():
     if platform.system() == 'Windows':
         return os.getlogin() or os.environ.get('USERNAME', 'unknown')
     else:
         return os.getlogin() or subprocess.getoutput('whoami')
+
+def scroll_to_bottom():
+    # Get scroll height.
+
+    last_height = driver.execute_script("return document.body.scrollHeight")
+
+    while True:
+        # Scroll down to the bottom.
+        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        print('scrolling...')
+        time.sleep(7)
+        # Calculate new scroll height and compare with last scroll height.
+        new_height = driver.execute_script("return document.body.scrollHeight")
+        if new_height == last_height:
+            break
+        last_height = new_height
+
+
+def get_execution_context():
+    return os.getenv('USER_EXECUTION', 'manual')
 
 
 # Function to send email notification
