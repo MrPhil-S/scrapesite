@@ -207,8 +207,7 @@ username = helpers.get_username()
 
 #### Environment settings  #######
 if username == 'pi':
-    print('START SCROLL')
-    helpers.scroll_to_bottom()
+    helpers.scroll_to_bottom(driver)
     connection = mysql.connector.connect(**my_secrets.db_config_production)
     #TODO: #Add random dealy
 else:

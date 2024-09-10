@@ -24,7 +24,7 @@ def get_username():
     else:
         return os.getlogin() or subprocess.getoutput('whoami')
 
-def scroll_to_bottom():
+def scroll_to_bottom(driver):
     # Get scroll height.
 
     last_height = driver.execute_script("return document.body.scrollHeight")
@@ -32,7 +32,6 @@ def scroll_to_bottom():
     while True:
         # Scroll down to the bottom.
         driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-        print('scrolling...')
         time.sleep(7)
         # Calculate new scroll height and compare with last scroll height.
         new_height = driver.execute_script("return document.body.scrollHeight")
