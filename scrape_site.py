@@ -1,5 +1,6 @@
 import logging
 import os
+import random
 import re
 import smtplib
 import time
@@ -23,10 +24,18 @@ import helpers
 import my_secrets
 
 logger = logging.getLogger(__name__)
-
 logging.basicConfig(level=logging.DEBUG, filename='app.log', filemode='w', format='%(asctime)s - %(levelname)s - %(message)s')
 logger.info(f"Job started")
 
+if helpers.is_production():
+    # Random delay between 0 and 1.5 hours
+    delay_hours = random.uniform(0, 1.5)
+    delay_seconds = delay_hours * 3600  # Convert hours to seconds
+    logger.info(f"Delaying for {delay_hours:.2f} hours...")
+
+    # Sleep for the calculated number of seconds
+    time.sleep(delay_seconds)
+    logger.info("Execution resumed!")
 
 def clean_money(price_saleprice_dirty):
     price_saleprice_clean = price_saleprice_dirty.replace('$','').replace(',','')
@@ -186,14 +195,7 @@ def get_average_discount():
     result = cursor.fetchone()
     return result["average_discount"]
 
-
-# Setup the Chrome driver
-#options = driver.webdriver.ChromeOptions()
-#driver.options.add_argument('--headless')  # Run in headless mode
-#driver.options.add_argument('--disable-gpu')  # Disable GPU acceleration
 driver = driver.driver
-#driver = webdriver.Chrome()
-
 url = my_secrets.url
 
 # Open the URL
@@ -206,7 +208,7 @@ WebDriverWait(driver, 20).until(EC.presence_of_element_located(card__information
 username = helpers.get_username()
 
 #### Environment settings  #######
-if username == 'pi':
+if helpers.is_production():
     helpers.scroll_to_bottom(driver)
     connection = mysql.connector.connect(**my_secrets.db_config_production)
     #TODO: #Add random dealy

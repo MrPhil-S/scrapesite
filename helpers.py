@@ -14,7 +14,6 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import pandas as pd
 
-import driver
 from my_secrets import gmail_app_pw
 
 
@@ -24,11 +23,15 @@ def get_username():
     else:
         return os.getlogin() or subprocess.getoutput('whoami')
 
+def is_production():
+    if get_username() == 'pi':
+        return True
+    else:
+        return False
+
 def scroll_to_bottom(driver):
     # Get scroll height.
-
     last_height = driver.execute_script("return document.body.scrollHeight")
-
     while True:
         # Scroll down to the bottom.
         driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
@@ -104,9 +107,12 @@ def send_email(formatted_salelist, formatted_new_or_changed_prices, percent_disc
     </body>
     </html>
     """
-
+    if is_production():
+        subject = 'Booz update!'
+    else:
+        subject = 'Booz update! (DEV)'
     msg = MIMEMultipart()
-    msg['Subject'] = 'Booz update!'
+    msg['Subject'] = subject
     msg['From'] = sender_email
     msg['To'] = receiver_email
 
@@ -117,6 +123,7 @@ def send_email(formatted_salelist, formatted_new_or_changed_prices, percent_disc
     with smtplib.SMTP_SSL('smtp.gmail.com', 465, context=context) as server:
         server.login(sender_email, password)
         server.sendmail(sender_email, receiver_email, msg.as_string())
+        print('Email sent!')
 
 def generate_price_history_chart(booz_id):
     today = datetime.date.today()
