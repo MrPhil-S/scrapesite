@@ -1,12 +1,8 @@
 import logging
-import os
 import random
-import re
-import smtplib
 import time
 import traceback  # <<<<<<<<<<<<<remove this later
 from decimal import Decimal
-from email.mime.text import MIMEText
 
 import mysql.connector
 from mysql.connector import Error

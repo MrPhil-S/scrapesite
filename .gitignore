@@ -1,5 +1,6 @@
 __pycache__/
 scrapeboozvenv/
+pi_backup/
 my_secrets.py
 *.log
 temp.txt
