@@ -337,7 +337,9 @@ try:
     percent_discounted = get_percent_discounted()
     average_discount = get_average_discount()
     helpers.send_email(formatted_salelist, formatted_new_or_changed_prices, percent_discounted, average_discount, formatted_watchlist)
-
+    if formatted_watchlist:
+        helpers.Send_text_message(formatted_watchlist)
+        
     
 
 except (Error, mysql.connector.Error) as Error:

@@ -14,7 +14,8 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from my_secrets import gmail_app_pw
+from my_secrets import (gmail_app_pw, receiver_email_address,
+                        receiver_text_message_address, sender_email_address)
 
 
 def get_username():
@@ -49,8 +50,8 @@ def get_execution_context():
 
 # Function to send email notification
 def send_email(formatted_salelist, formatted_new_or_changed_prices, percent_discounted, average_discount, formatted_watchlist=None):
-    sender_email = "nopschims@gmail.com"
-    receiver_email = "pschims@gmail.com"
+    sender_email = sender_email_address
+    receiver_email = receiver_email_address
     password = gmail_app_pw
 
     if formatted_watchlist:
@@ -124,6 +125,40 @@ def send_email(formatted_salelist, formatted_new_or_changed_prices, percent_disc
         server.login(sender_email, password)
         server.sendmail(sender_email, receiver_email, msg.as_string())
         print('Email sent!')
+
+
+def Send_text_message(formatted_list):
+    sender_email = sender_email_address
+    receiver_email = receiver_text_message_address
+    password = gmail_app_pw
+
+    formatted_watchlist_list = ''.join(f'<li>{watchlist_item}</li>' for watchlist_item in formatted_list)
+    watchlist_scection = f"""
+    <p>Watchlist:</p>
+    <ul>
+        {formatted_watchlist_list}
+    </ul>
+    """
+    body_html = formatted_watchlist_list
+    
+    if is_production():
+        subject = 'Watchlist Hit!'
+    else:
+        subject = 'Watchlist Hit (DEV)'
+    msg = MIMEMultipart()
+    msg['Subject'] = subject
+    msg['From'] = sender_email
+    msg['To'] = receiver_email
+
+    msg.attach(MIMEText(body_html, 'html', 'utf-8'))    
+
+    context = ssl.create_default_context()
+
+    with smtplib.SMTP_SSL('smtp.gmail.com', 465, context=context) as server:
+        server.login(sender_email, password)
+        server.sendmail(sender_email, receiver_email, msg.as_string())
+        print('Text message sent!')
+
 
 def generate_price_history_chart(booz_id):
     today = datetime.date.today()
