@@ -133,12 +133,6 @@ def Send_text_message(formatted_list):
     password = gmail_app_pw
 
     formatted_watchlist_list = ''.join(f'<li>{watchlist_item}</li>' for watchlist_item in formatted_list)
-    watchlist_scection = f"""
-    <p>Watchlist:</p>
-    <ul>
-        {formatted_watchlist_list}
-    </ul>
-    """
     body_html = formatted_watchlist_list
     
     if is_production():

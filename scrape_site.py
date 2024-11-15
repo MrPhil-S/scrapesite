@@ -135,7 +135,7 @@ def get_sale_hits(discount):
 
 def get_new_or_changed_prices(run_id):
     cursor.execute(f"""
-WITH cte AS
+    WITH cte AS
     (SELECT 
             b.booz_id,
             b.booz_name,
@@ -196,6 +196,7 @@ def get_average_discount():
         WHERE sale_price is not null""")
     result = cursor.fetchone()
     return result["average_discount"]
+
 
 driver = driver.driver
 url = my_secrets.url
@@ -270,14 +271,14 @@ except StaleElementReferenceException:
     print("StaleElementReferenceException encountered")
     traceback.print_exc()
 
-
 finally:
     driver.quit()   
 
-try:
-    helpers.get_execution_context
-    #helpers.get_username    
 
+
+
+
+try:
     if connection.is_connected():
         cursor = connection.cursor(dictionary=True)
 
@@ -341,7 +342,6 @@ try:
         helpers.Send_text_message(formatted_watchlist)
         
     
-
 except (Error, mysql.connector.Error) as Error:
     print(f"Error: {Error}")
     traceback.print_exc()
