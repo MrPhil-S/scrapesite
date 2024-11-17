@@ -3,7 +3,7 @@ import requests
 import my_secrets
 
 # Base URL (example)
-url = my_secrets.product_url
+url = my_secrets.b_product_url
 
 # Headers from Chrome DevTools
 headers = {
