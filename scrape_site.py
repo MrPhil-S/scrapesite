@@ -87,7 +87,7 @@ def insert_booz_data(booz_id, price, sale_price, run_id, check_price):
 
 def get_watchlist_hits():
     cursor.execute("""
-                    SELECT b.booz_id, b.link, b.booz_name, b.link, COALESCE(bs.sale_price, bs.price) price, w.price_point
+                    SELECT b.booz_id, b.link, b.booz_name, b.link, COALESCE(bs.sale_price, bs.price) price, b.watchlist_price
                     FROM `booz` b 
                     LEFT JOIN
                         (SELECT
@@ -98,9 +98,7 @@ def get_watchlist_hits():
                             scrape_date 
                         FROM  booz_scraped )bs 
                     ON b.booz_id = bs.booz_id and bs.row_num = 1
-                    LEFT JOIN watchlist w
-                    ON w.booz_name = b.booz_name
-                    WHERE COALESCE(bs.sale_price, bs.price) < w.price_point""")
+                    WHERE COALESCE(bs.sale_price, bs.price) < b.watchlist_price""")
     watchlist_hits = cursor.fetchall()
 
     formatted_watchlist = [f'''<a href="{row["link"]}">{row["booz_name"]}</a> ({row["booz_id"]}) 
