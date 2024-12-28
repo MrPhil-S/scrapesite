@@ -231,8 +231,8 @@ try:
         link = link_element.get_attribute('href')
         price_saleprice_dirty = card.find_element(By.CLASS_NAME, 'card__product-price').text
         price_saleprice_clean_list = clean_money(price_saleprice_dirty).split()
-        if len(price_saleprice_clean_list) == 2:
-            price, sale_price = price_saleprice_clean_list
+        if len(price_saleprice_clean_list) >= 2:
+            price, sale_price = price_saleprice_clean_list[:2]
             if isinstance(price, str):
                 price = Decimal(price)
             if isinstance(sale_price, str):
