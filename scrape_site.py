@@ -1,5 +1,6 @@
 import logging
 import random
+import sys
 import time
 import traceback  # <<<<<<<<<<<<<remove this later
 from decimal import Decimal
@@ -24,18 +25,25 @@ logging.basicConfig(level=logging.DEBUG, filename='app.log', filemode='w', forma
 logger.info(f"Job started")
 print("Job started")
 
-if helpers.is_production():
-    # Random delay between 0 and 1.5 hours
-    delay_hours = random.uniform(0, 1.5)
-    delay_seconds = delay_hours * 3600  # Convert hours to seconds
-    message = f"Delaying for {delay_hours:.2f} hours..."
-    print(message)
-    logger.info(message)
-
-    # Sleep for the calculated number of seconds
+if 1==1:#helpers.is_production():  #this may be unnecessary
+        
+    if len(sys.argv) > 1:
+        delay_seconds = int(sys.argv[1])
+        message = f"Parameterized delay for {delay_seconds:.2f} seconds..."
+        print(message)
+        logger.info(message)
+    else:
+        # Random delay between 0 and 1.5 hours
+        delay_hours = random.uniform(0, 1.5)
+        delay_seconds = delay_hours * 3600  # Convert hours to seconds
+        message = f"Default (random) delay for {delay_hours:.2f} hours..."
+        print(message)
+        logger.info(message)
+    
+       # Sleep for the calculated number of seconds
     time.sleep(delay_seconds)
-    logger.info("Execution resumed!")
-    print("Execution resumed!")
+    logger.info("Execution resuming...")
+    print("Execution resuming...")
 
 def clean_money(price_saleprice_dirty):
     price_saleprice_clean = price_saleprice_dirty.replace('$','').replace(',','')
