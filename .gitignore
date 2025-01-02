@@ -1,5 +1,6 @@
 __pycache__/
 scrapeboozvenv/
+bevmo_scraper_venv/
 pi_backup/
 my_secrets.py
 *.log
