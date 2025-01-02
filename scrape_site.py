@@ -87,7 +87,7 @@ def insert_booz_data(booz_id, price, sale_price, run_id, check_price):
 
 def get_watchlist_hits():
     cursor.execute("""
-                    SELECT b.booz_id, b.link, b.booz_name, b.link, COALESCE(bs.sale_price, bs.price) price, b.watchlist_price
+                    SELECT b.booz_id, b.link, b.booz_name, b.link, COALESCE(bs.sale_price, bs.price) price, w.price_point
                     FROM `booz` b 
                     LEFT JOIN
                         (SELECT
@@ -98,7 +98,9 @@ def get_watchlist_hits():
                             scrape_date 
                         FROM  booz_scraped )bs 
                     ON b.booz_id = bs.booz_id and bs.row_num = 1
-                    WHERE COALESCE(bs.sale_price, bs.price) < b.watchlist_price""")
+                    LEFT JOIN watchlist w
+                    ON w.booz_name = b.booz_name
+                    WHERE COALESCE(bs.sale_price, bs.price) < w.price_point""")
     watchlist_hits = cursor.fetchall()
 
     formatted_watchlist = [f'''<a href="{row["link"]}">{row["booz_name"]}</a> ({row["booz_id"]}) 
@@ -195,7 +197,6 @@ def get_average_discount():
     result = cursor.fetchone()
     return result["average_discount"]
 
-
 driver = driver.driver
 url = my_secrets.url
 
@@ -236,7 +237,7 @@ try:
             if isinstance(price, str):
                 price = Decimal(price)
             if isinstance(sale_price, str):
-                sale_price = Decimal(sale_price)    
+                sale_price = Decimal(sale_price)     
 
         elif len(price_saleprice_clean_list) == 1:
             price = price_saleprice_clean_list[0]
@@ -269,12 +270,9 @@ except StaleElementReferenceException:
     print("StaleElementReferenceException encountered")
     traceback.print_exc()
 
+
 finally:
     driver.quit()   
-
-
-
-
 
 try:
     if connection.is_connected():
@@ -340,6 +338,7 @@ try:
         helpers.Send_text_message(formatted_watchlist)
         
     
+
 except (Error, mysql.connector.Error) as Error:
     print(f"Error: {Error}")
     traceback.print_exc()
