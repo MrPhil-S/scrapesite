@@ -6,6 +6,7 @@ import traceback  # <<<<<<<<<<<<<remove this later
 from decimal import Decimal
 
 import mysql.connector
+import requests
 from mysql.connector import Error
 #from selenium import webdriver
 from selenium.common.exceptions import (NoSuchElementException,
@@ -25,21 +26,20 @@ logging.basicConfig(level=logging.DEBUG, filename='app.log', filemode='w', forma
 logger.info(f"Job started")
 print("Job started")
 
-if 1==1:#helpers.is_production():  #this may be unnecessary
-        
-    if len(sys.argv) > 1:
-        delay_seconds = int(sys.argv[1])
-        message = f"Parameterized delay for {delay_seconds:.2f} seconds..."
-        print(message)
-        logger.info(message)
-    else:
-        # Random delay between 0 and 1.5 hours
-        delay_hours = random.uniform(0, 1.5)
-        delay_seconds = delay_hours * 3600  # Convert hours to seconds
-        message = f"Default (random) delay for {delay_hours:.2f} hours..."
-        print(message)
-        logger.info(message)
-    
+# This script takes an optopional parameter that specifies the delay in seconds (0 for example), otherwise it will use a random delay        
+if len(sys.argv) > 1:
+    delay_seconds = int(sys.argv[1])
+    message = f"Parameterized delay for {delay_seconds:.2f} seconds..."
+    print(message)
+    logger.info(message)
+else:
+    # Random delay between 0 and 1.5 hours
+    delay_hours = random.uniform(0, 1.5)
+    delay_seconds = delay_hours * 3600  # Convert hours to seconds
+    message = f"Default (random) delay for {delay_hours:.2f} hours..."
+    print(message)
+    logger.info(message)
+
        # Sleep for the calculated number of seconds
     time.sleep(delay_seconds)
     logger.info("Execution resuming...")
@@ -206,6 +206,62 @@ def get_average_discount():
     return result["average_discount"]
 
 driver = driver.driver
+
+#### Environment settings  #######
+if helpers.is_production():
+    connection = mysql.connector.connect(**my_secrets.db_config_production)
+else:
+    connection = mysql.connector.connect(**my_secrets.db_config_dev)
+    pass 
+
+# headers = {
+#     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+# }
+
+headers = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36",
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Encoding": "gzip, deflate, br, zstd",
+    "accept-language": "en-US,en;q=0.9"
+}
+
+
+if connection.is_connected():
+    cursor = connection.cursor(dictionary=True)
+    cursor.execute("SELECT product_identifier, source_site, source_site_url FROM individual_watchlist")
+    individual_watchlist = cursor.fetchall()
+
+scrape_ids_b = []
+scrape_ids_w = []
+scrape_url_b = None
+scrape_url_w = None
+for item in individual_watchlist:
+    if item['source_site'] == my_secrets.product_site_b:
+        scrape_ids_b.append(item['product_identifier'])
+        if not scrape_url_b:
+            scrape_url_b = item['source_site_url']
+    if item['source_site'] == my_secrets.product_site_w:
+        scrape_ids_w.append(item['product_identifier'])
+        if not scrape_url_w:
+            scrape_url_w = item['source_site_url']
+#requests b site:         
+params = {"ids":scrape_ids_b,"fulfillment_type":"pickup","location_id":404,"shopify_shop_domain":"bevmo-ca.myshopify.com"}
+
+#requests w site:
+params = {"shoppingMethod":"INSTORE_PICKUP","state":"US-CA","attrConfig":"true","storeId":"1129"}
+
+urls = [scrape_url_w.format(product_id=product_id) for product_id in scrape_ids_w]
+
+for url in urls:
+    print(url)
+    response = requests.get(url, headers=headers, params=params)
+    if response.status_code == 200:
+        data = response.json()
+    else:
+        print(f"Error: {response.status_code} - {response.text}")
+
+
+#Process bulk scrape:
 url = my_secrets.url
 
 # Open the URL
