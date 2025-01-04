@@ -6,3 +6,4 @@ my_secrets.py
 *.log
 temp.txt
 *.html
+.vscode/
