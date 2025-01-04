@@ -95,7 +95,7 @@ def insert_booz_data(booz_id, price, sale_price, run_id, check_price):
 
 def get_watchlist_hits():
     cursor.execute("""
-                    SELECT b.booz_id, b.link, b.booz_name, b.link, COALESCE(bs.sale_price, bs.price) price, w.price_point
+                    SELECT b.booz_id, b.link, b.booz_name, b.link, COALESCE(bs.sale_price, bs.price) price, b.watchlist_price
                     FROM `booz` b 
                     LEFT JOIN
                         (SELECT
@@ -106,13 +106,11 @@ def get_watchlist_hits():
                             scrape_date 
                         FROM  booz_scraped )bs 
                     ON b.booz_id = bs.booz_id and bs.row_num = 1
-                    LEFT JOIN watchlist w
-                    ON w.booz_name = b.booz_name
-                    WHERE COALESCE(bs.sale_price, bs.price) < w.price_point""")
+                    WHERE COALESCE(bs.sale_price, bs.price) < b.watchlist_price""")
     watchlist_hits = cursor.fetchall()
 
     formatted_watchlist = [f'''<a href="{row["link"]}">{row["booz_name"]}</a> ({row["booz_id"]}) 
-                           <br> The price is below the price point of ${row["price_point"]}: It is now <b>${row["price"]}</b>''' 
+                           <br> The price is below the price point of ${row["watchlist_price"]}: It is now <b>${row["price"]}</b>''' 
                            for row in watchlist_hits]
      
     return formatted_watchlist
@@ -228,7 +226,7 @@ headers = {
 
 if connection.is_connected():
     cursor = connection.cursor(dictionary=True)
-    cursor.execute("SELECT product_identifier, source_site, source_site_url FROM individual_watchlist")
+    cursor.execute("SELECT product_identifier, source_site, link FROM booz where scrape_method = 'individual'")
     individual_watchlist = cursor.fetchall()
 
 scrape_ids_b = []
@@ -260,6 +258,32 @@ for url in urls:
     else:
         print(f"Error: {response.status_code} - {response.text}")
 
+if helpers.is_production():
+    connection = mysql.connector.connect(**my_secrets.db_config_production)
+    #TODO: #Add random dealy
+else:
+    connection = mysql.connector.connect(**my_secrets.db_config_dev)
+    pass 
+
+try:
+    if connection.is_connected():
+        cursor = connection.cursor(dictionary=True)
+
+    insert_run_query = """
+        INSERT INTO run (username, execution_context) 
+        VALUES (%s, %s)"""
+    username = helpers.get_username()
+    execution_context = helpers.get_execution_context()
+
+    # Execute the query with the parameters
+    cursor.execute(insert_run_query, (username, execution_context))
+    connection.commit()
+    run_id = cursor.lastrowid
+
+except (Error, mysql.connector.Error) as Error:
+    print(f"Error: {Error}")
+    traceback.print_exc()
+    logger.error(traceback.print_exc())
 
 #Process bulk scrape:
 url = my_secrets.url
@@ -273,19 +297,14 @@ WebDriverWait(driver, 20).until(EC.presence_of_element_located(card__information
 
 username = helpers.get_username()
 
-#### Environment settings  #######
 if helpers.is_production():
     helpers.scroll_to_bottom(driver)
-    connection = mysql.connector.connect(**my_secrets.db_config_production)
-    #TODO: #Add random dealy
-else:
-    connection = mysql.connector.connect(**my_secrets.db_config_dev)
-    pass 
 
 time.sleep(10)
 
 cards = driver.find_elements(By.CLASS_NAME, "card__information")
-print(f'card count: {len(cards)}')
+scrape_count = len(cards)
+print(f'card count: {scrape_count}')
 
 scraped_booz = []
 
@@ -334,64 +353,53 @@ except StaleElementReferenceException:
     print("StaleElementReferenceException encountered")
     traceback.print_exc()
 
-
 finally:
     driver.quit()   
 
 try:
-    if connection.is_connected():
-        cursor = connection.cursor(dictionary=True)
+#    if connection.is_connected():
+#     cursor = connection.cursor(dictionary=True)
 
-        insert_run_query = """
-            INSERT INTO run (username, execution_context) 
-            VALUES (%s, %s)"""
-        username = helpers.get_username()
-        execution_context = helpers.get_execution_context()
+    # cursor.execute("""
+    # SELECT price, sale_price
+    # FROM booz_scraped bs
+    # WHERE bs.date_scraped = 
+    #     (SELECT MAX(date_scraped)
+    #      FROM booz_scraped
+    #      WHERE booz_id = %s)
+    # AND bs.booz_id = %s
+    # """, (booz_id,booz_id,))
+    # existing_data = cursor.fetchone()
 
-        # Execute the query with the parameters
-        cursor.execute(insert_run_query, (username, execution_context))
-        connection.commit()
-        run_id = cursor.lastrowid
+    cursor.execute("""
+                    SELECT b.booz_id, booz_name
+                    FROM booz b 
+                    WHERE 
+                        b.source_site = 'bm' AND
+                        b.scrape_method = 'bulk'
+                    """)
+    existing_items = cursor.fetchall()
+    booz_names_existing = {existing_item['booz_name']: existing_item['booz_id'] for existing_item in existing_items}
 
-        # cursor.execute("""
-        # SELECT price, sale_price
-        # FROM booz_scraped bs
-        # WHERE bs.date_scraped = 
-        #     (SELECT MAX(date_scraped)
-        #      FROM booz_scraped
-        #      WHERE booz_id = %s)
-        # AND bs.booz_id = %s
-        # """, (booz_id,booz_id,))
-        # existing_data = cursor.fetchone()
+    #booz_names_existing = {row[0]: row[1] for row in result}  # row[0] is booz_id, row[1] is booz_name
 
-        cursor.execute("""
-                       SELECT b.booz_id, booz_name, bs.price, bs.sale_price 
-                       FROM booz b 
-                       LEFT JOIN booz_scraped bs 
-                       on b.booz_id = bs.booz_id""")
-        existing_items = cursor.fetchall()
-        booz_names_existing = {item['booz_name']: item['booz_id'] for item in existing_items}
+    for scraped_item in scraped_booz:
+        if scraped_item['booz_name'] in booz_names_existing:
+            booz_id = booz_names_existing[scraped_item['booz_name']] #<<< id that correct?
+            insert_booz_data(booz_id, scraped_item['price'], scraped_item['sale_price'], run_id, True)
+        else:
+            booz_name = scraped_item['booz_name']
+            link = scraped_item['link']
+            insert_query = """
+                INSERT INTO booz (booz_name, source_site, type, link, scrape_method, run_id)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                """
+            cursor.execute(insert_query, (booz_name, 'bm', booz_page, link, 'bulk', run_id))
+            connection.commit()
+            booz_id = cursor.lastrowid
+            print(f'inserted {booz_name}')
+            insert_booz_data(booz_id, scraped_item['price'], scraped_item['sale_price'], run_id, False)
 
-        #booz_names_existing = {row[0]: row[1] for row in result}  # row[0] is booz_id, row[1] is booz_name
-
-        for item in scraped_booz:
-            if item['booz_name'] in booz_names_existing:
-                booz_id = booz_names_existing[item['booz_name']] #<<< id that correct?
-                insert_booz_data(booz_id, item['price'], item['sale_price'], run_id, True)
-            else:
-                booz_name = item['booz_name']
-                link = item['link']
-                insert_query = """
-                    INSERT INTO booz (booz_name, type, link, run_id)
-                    VALUES (%s, %s, %s, %s)
-                    """
-                cursor.execute(insert_query, (booz_name, booz_page, link, run_id))
-                connection.commit()
-                booz_id = cursor.lastrowid
-                print(f'inserted {booz_name}')
-                insert_booz_data(booz_id, item['price'], item['sale_price'], run_id, False)
-    else:
-        print("Not connected to the database")
     formatted_watchlist = get_watchlist_hits()
     formatted_salelist = get_sale_hits(25)
     formatted_new_or_changed_prices = get_new_or_changed_prices(run_id)
@@ -401,7 +409,13 @@ try:
     if formatted_watchlist:
         helpers.Send_text_message(formatted_watchlist)
         
-    
+    update_run_query = """
+        UPDATE run
+        SET bm_scrape_count = %s, complete_date = NOW()
+        WHERE run_id = %s
+    """
+    cursor.execute(update_run_query, (scrape_count, run_id))
+    connection.commit()
 
 except (Error, mysql.connector.Error) as Error:
     print(f"Error: {Error}")
