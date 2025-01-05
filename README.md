@@ -1,4 +1,5 @@
 App uses:
+
 Scraping: Selenium and Requests.
 
 Data Management: SQLAlchemy for DB interaction.
