@@ -16,10 +16,11 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support.wait import WebDriverWait
+from sqlalchemy import func
+from sqlalchemy.orm import Session
 
-import driver
-import helpers
-import my_secrets
+from . import driver, helpers, models, my_secrets
+from .database import Base, SessionLocal
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG, filename='app.log', filemode='w', format='%(asctime)s - %(levelname)s - %(message)s')
@@ -54,6 +55,8 @@ def insert_booz_data(booz_id, price, sale_price, run_id, check_price):
     insert_booz_data = """INSERT INTO booz_scraped (booz_id, price, sale_price, run_id)
         VALUES (%s,%s,%s,%s)
         """
+    
+
     if check_price:
         cursor.execute("""
         SELECT price, sale_price
@@ -78,7 +81,9 @@ def insert_booz_data(booz_id, price, sale_price, run_id, check_price):
 
             cursor.reset() 
             if existing_price != price or existing_sale_price != sale_price:
+                
                 cursor.execute(insert_booz_data, (booz_id, price, sale_price, run_id))
+                
                 connection.commit()
                 print(f'inserted prices info for EXISTING item {booz_id}')
             else:
@@ -187,13 +192,17 @@ def get_new_or_changed_prices(run_id):
 
     return formatted_new_or_changed_prices
 
-def get_percent_discounted():
-    cursor.execute("""
-        SELECT CAST(COUNT(sale_price) / COUNT(*) * 100 AS INT) AS percent_discounted
-        FROM booz_scraped
-    """)
-    result = cursor.fetchone()
-    return result["percent_discounted"]
+def get_percent_discounted(db: Session):
+    # Count items with sale_price != null and total items
+    count_sale_price = db.query(func.count(models.Booz_scraped.sale_price)).filter(models.Booz_scraped.sale_price.isnot(None)).scalar()
+    count_total = db.query(func.count(models.Booz_scraped.booz_scraped_id)).scalar()
+    
+    if count_total == 0:  # To avoid division by zero
+        return 0
+
+    # Calculate the percentage
+    percent_discounted = (count_sale_price / count_total) * 100
+    return int(percent_discounted)
 
 def get_average_discount():
     cursor.execute("""
@@ -403,7 +412,26 @@ try:
     formatted_watchlist = get_watchlist_hits()
     formatted_salelist = get_sale_hits(25)
     formatted_new_or_changed_prices = get_new_or_changed_prices(run_id)
-    percent_discounted = get_percent_discounted()
+    ###################
+    
+    
+# Main execution
+    if __name__ == "__main__":
+        # Create a new session
+        db = SessionLocal()
+
+        try:
+            # Call the function
+            percent_discounted = get_percent_discounted(db)
+            print(f"Percentage of items discounted: {percent_discounted}%")
+        except Exception as e:
+            print(f"An error occurred: {e}")
+        finally:
+            # Close the session
+            db.close()
+    
+    #################
+    
     average_discount = get_average_discount()
     helpers.send_email(formatted_salelist, formatted_new_or_changed_prices, percent_discounted, average_discount, formatted_watchlist)
     if formatted_watchlist:

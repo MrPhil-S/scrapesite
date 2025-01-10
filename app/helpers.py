@@ -14,8 +14,8 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from my_secrets import (gmail_app_pw, receiver_email_address,
-                        receiver_text_message_address, sender_email_address)
+from .my_secrets import (gmail_app_pw, receiver_email_address,
+                         receiver_text_message_address, sender_email_address)
 
 
 def get_username():

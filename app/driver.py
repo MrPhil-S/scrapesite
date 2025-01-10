@@ -3,7 +3,7 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 
-from helpers import is_production
+from .helpers import is_production
 
 if is_production():
 	options = Options()
