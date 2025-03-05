@@ -28,3 +28,4 @@ This project is designed to **scrape retail sites** to track price changes and n
 - 📊 **Interactive dashboards** built with **Streamlit** for data visualization.
 - 📈 **Advanced analytics** to help users decide the best time to buy items.
 
+<img width="879" alt="scrape" src="https://github.com/user-attachments/assets/3fd30546-e854-432d-93a8-f07423e1c6ae" />
